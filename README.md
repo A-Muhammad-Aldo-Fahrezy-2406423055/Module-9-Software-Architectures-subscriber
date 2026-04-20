@@ -53,3 +53,60 @@ pesan berhasil diproses satu per satu oleh subscriber.
 Pola penurunan yang lambat dan linear ini adalah bukti nyata dari subscriber yang
 lambat, berbeda dengan subscriber normal yang langsung menguras queue hampir
 seketika.
+
+# Running at least three subscribers simultaneously
+
+## Screenshot of Terminal 3 simultaneous Subscribers + Publisher
+
+![3 Subscribers Terminal](assets/images/Terminal%20of%203%20subscribers%20and%201%20publisher.png)
+
+Dengan menjalankan **3 subscriber** secara bersamaan dan publisher dijalankan beberapa
+kali, terlihat bahwa pemrosesan event terbagi secara otomatis di antara ketiga
+subscriber. Tidak ada subscriber yang memproses event yang sama, RabbitMQ
+mendistribusikan setiap pesan hanya ke **satu** consumer secara bergantian
+(sesuai dengan algoritma *round-robin*). Misalnya, subscriber 1 memproses `Amir` dan `Dira`, subscriber 2 memproses `Budi` dan `Emir`, dan subscriber 3 memproses `Cica` dan seterusnya.
+
+---
+
+## Screenshot of RabbitMQ Queue Terkuras Lebih Cepat
+
+![Multiple Subscribers Queue 1](assets/images/RabbitMQ%20multiple%20subsribers%20queue%201.png)
+![Multiple Subscribers Queue 2](assets/images/RabbitMQ%20multiple%20subsribers%20queue%202.png)
+
+Dibandingkan dengan skenario 1 subscriber, grafik **Queued messages** kini menunjukkan
+spike yang jauh lebih kecil (maksimal ~10 pesan) dan antrian kembali ke 0 dengan
+jauh lebih cepat. Terlihat pula pada **Global counts** bahwa `Consumers: 3` yang
+mengkonfirmasi 3 subscriber aktif terhubung ke broker secara bersamaan.
+
+---
+
+## A little bit of reflection: Mengapa bisa seperti ini?
+
+Karena setiap subscriber memiliki delay 1 detik per pesan, satu subscriber hanya
+mampu mengonsumsi ~1 pesan/detik. Dengan 3 subscriber aktif, throughput konsumsi
+efektif menjadi ~3 pesan/detik. Inilah yang disebut **horizontal scaling** pada
+consumer. Menambah jumlah consumer adalah cara paling sederhana dan efektif untuk
+mengatasi subscriber yang lambat tanpa mengubah kode sama sekali.
+
+---
+
+## Apa yang bisa diperbaiki dari kode publisher dan subscriber?
+
+Melihat kembali kode keduanya, terdapat beberapa hal yang bisa ditingkatkan:
+
+1. **Publisher tidak memiliki konfirmasi pengiriman.** Saat ini publisher menggunakan
+   `_ = p.publish_event(...)` yang mengabaikan nilai return. Sebaiknya error ditangani
+   dengan benar agar publisher tahu jika pengiriman gagal.
+
+2. **Jumlah pesan publisher di-hardcode.** Publisher selalu mengirim tepat 5 pesan
+   dengan nama yang tetap. Idealnya data ini bisa dibaca dari input atau file agar
+   lebih fleksibel dan realistis.
+
+3. **Subscriber tidak memiliki graceful shutdown.** Loop `loop {}` pada subscriber
+   berjalan selamanya tanpa mekanisme untuk berhenti dengan bersih. Sebaiknya
+   ditambahkan signal handler (misalnya menangkap `Ctrl+C`) agar koneksi ke broker
+   ditutup dengan benar saat subscriber dihentikan.
+
+4. **Delay di subscriber di-hardcode.** Nilai `1000ms` pada `thread::sleep` seharusnya
+   bisa dikonfigurasi via environment variable, sehingga lebih mudah disesuaikan
+   tanpa mengubah kode.
