@@ -29,11 +29,14 @@ impl MessageHandler<UserCreatedEventMessage> for UserCreatedHandler {
 }
 
 fn main() {
-    let listener = CrosstownBus::new_queue_listener("amqp://guest:guest@localhost:5672".to_owned())
-        .unwrap();
+    dotenv::dotenv().ok();
+    let amqp_url = std::env::var("AMQP_URL").unwrap_or_else(|_| "amqp://guest:guest@localhost:5672".into());
+    println!("Connecting to RabbitMQ Broker...");
+    let listener = CrosstownBus::new_queue_listener(amqp_url).unwrap();
+    println!("Connected successfully! Listening for messages...");
     
     _ = listener.listen("user_created".to_owned(), UserCreatedHandler{}, 
-    crosstown_bus::QueueProperties { auto_delete: false, durable: false,
+    crosstown_bus::QueueProperties { auto_delete: false, durable: true,
     use_dead_letter: true });
 
     loop {

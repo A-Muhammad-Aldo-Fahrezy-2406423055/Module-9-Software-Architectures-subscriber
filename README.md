@@ -110,3 +110,28 @@ Melihat kembali kode keduanya, terdapat beberapa hal yang bisa ditingkatkan:
 4. **Delay di subscriber di-hardcode.** Nilai `1000ms` pada `thread::sleep` seharusnya
    bisa dikonfigurasi via environment variable, sehingga lebih mudah disesuaikan
    tanpa mengubah kode.
+
+---
+
+# Bonus: Running on Cloud
+
+Untuk menyelesaikan tugas bonus, eksperimen di atas diulang kembali dengan RabbitMQ yang berjalan di cloud (Railway), bukan di mesin lokal. Publisher dan subscriber tetap dijalankan dari komputer lokal, tetapi keduanya terhubung ke broker RabbitMQ yang di-deploy pada cloud melalui URL koneksi `amqp://` yang disediakan oleh Railway.
+
+## Screenshot of RabbitMQ Web UI on Cloud
+
+![Running 3 subscribers on Cloud (RabbitMQ Web UI)](assets/images/Running%203%20subscribers%20on%20Cloud%20(rabbitmq%20web%20ui).png)
+
+Pada tampilan RabbitMQ Management yang berjalan di cloud (Railway), terlihat bahwa broker berhasil diakses melalui URL `rabbitmq-web-ui-production-b12e.up.railway.app`. Global counts menunjukkan `Connections: 3`, `Exchanges: 11`, dan `Queues: 2`, yang
+mengkonfirmasi bahwa ketiga subscriber berhasil terhubung ke broker cloud secara bersamaan. Node yang aktif adalah `rabbit@rabbitmq` yang berjalan di environment cloud Railway.
+
+## Screenshot of Terminal Running 3 Subscribers + 1 Publisher on Cloud
+
+![Running 3 subscribers on Cloud (Terminal)](assets/images/Running%203%20subscribers%20on%20Cloud%20(terminal).png)
+
+Dari terminal, terlihat bahwa 1 publisher dan 3 subscribers dijalankan secara bersamaan, semuanya terhubung ke broker RabbitMQ cloud. Publisher mengirimkan 5 event (`Amir`, `Budi`, `Cica`, `Dira`, `Emir`) ke queue, dan ketiga subscriber menerima pesan secara terdistribusi (seimbang) menggunakan algoritma round-robin:
+
+- **Subscriber 1** menerima: `Amir` (user_id: 1) dan `Dira` (user_id: 4)
+- **Subscriber 2** menerima: `Budi` (user_id: 2) dan `Emir` (user_id: 5)
+- **Subscriber 3** menerima: `Cica` (user_id: 3)
+
+Hasil ini menunjukkan bahwa mekanisme horizontal scaling dan round-robin distribution pada RabbitMQ bekerja sama persis baik di lingkungan lokal maupun di cloud. Perbedaan utamanya hanyalah pada latensi jaringan yang sedikit lebih tinggi karena koneksi melewati internet, namun semua fungsionalitas event-driven architecture tetap berjalan dengan baik.
